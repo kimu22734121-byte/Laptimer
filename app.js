@@ -143,13 +143,19 @@ function stopCamera() {
   updateStatus();
 }
 
+const landscapeMQ = window.matchMedia('(orientation: landscape) and (min-width: 640px)');
+if (landscapeMQ.addEventListener) landscapeMQ.addEventListener('change', () => requestAnimationFrame(layoutVideo));
+
 // 映像の縦横比に合わせて表示領域を決める（座標変換を単純にするため）
 function layoutVideo() {
   const vw = video.videoWidth || 16;
   const vh = video.videoHeight || 9;
   const aspect = vw / vh;
   const maxW = videoWrap.parentElement.clientWidth;
-  const maxH = Math.max(200, window.innerHeight * 0.42);
+  // 横画面ではカメラを大きく（ボタン分だけ残す）、縦画面では画面の約4割
+  const maxH = landscapeMQ.matches
+    ? Math.max(160, window.innerHeight - (window.innerHeight <= 500 ? 100 : 130))
+    : Math.max(200, window.innerHeight * 0.42);
   let w = maxW;
   let h = w / aspect;
   if (h > maxH) { h = maxH; w = h * aspect; }

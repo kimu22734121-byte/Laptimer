@@ -12,6 +12,8 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div class="app">
+  <div class="col-side">
   <header class="timer">
     <div class="status" id="status">カメラ停止中</div>
     <div class="current" id="current">0:00.00</div>
@@ -21,8 +23,9 @@
       <div><span class="label">TOTAL</span><span id="total">--</span></div>
     </div>
   </header>
+  </div>
 
-  <main>
+  <div class="col-main">
     <section class="camera-area" id="cameraArea">
       <div class="video-wrap" id="videoWrap">
         <video id="video" playsinline muted autoplay></video>
@@ -79,13 +82,16 @@
       </div>
       <p class="hint">誤検知する場合は感度の数値を上げる／しきい値を上げてください。検知しない場合は下げてください。ラインはコースの幅だけを横切るよう短めに引くと安定します。</p>
     </details>
+  </div>
 
+  <div class="col-side col-laps">
     <section class="laps">
       <h2>ラップ一覧</h2>
       <ol id="lapList" class="lap-list"></ol>
       <p class="empty" id="emptyMsg">まだ記録はありません</p>
     </section>
-  </main>
+  </div>
+</div>
 
   <script src="app.js"></script>
 </body>

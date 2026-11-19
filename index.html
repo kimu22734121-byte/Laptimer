@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f1115">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>マイコンカー ラップタイマー</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="timer">
+    <div class="status" id="status">カメラ停止中</div>
+    <div class="current" id="current">0:00.00</div>
+    <div class="stats">
+      <div><span class="label">LAP</span><span id="lapCount">0</span></div>
+      <div><span class="label">BEST</span><span id="best">--</span></div>
+      <div><span class="label">TOTAL</span><span id="total">--</span></div>
+    </div>
+  </header>
+
+  <main>
+    <section class="camera-area" id="cameraArea">
+      <div class="video-wrap" id="videoWrap">
+        <video id="video" playsinline muted autoplay></video>
+        <canvas id="overlay"></canvas>
+        <div class="placeholder" id="placeholder">
+          <p>「カメラ起動」を押してください</p>
+          <p class="small">起動後、黄色い計測ラインの両端の丸をドラッグしてコースを横切るように配置します</p>
+        </div>
+        <div class="flash" id="flash"></div>
+      </div>
+      <div class="meter" aria-label="検知レベル">
+        <div class="meter-bar" id="meterBar"></div>
+        <div class="meter-threshold" id="meterThreshold"></div>
+      </div>
+    </section>
+
+    <section class="controls">
+      <button id="btnCamera" class="btn">カメラ起動</button>
+      <button id="btnArm" class="btn primary" disabled>計測待機</button>
+      <button id="btnReset" class="btn">リセット</button>
+    </section>
+
+    <details class="settings" id="settings">
+      <summary>設定</summary>
+      <label class="row">
+        <span>検知感度 <small>(ライン上の変化割合)</small></span>
+        <span class="value"><output id="sensOut"></output>%</span>
+        <input type="range" id="sens" min="2" max="60" step="1">
+      </label>
+      <label class="row">
+        <span>明るさ差のしきい値</span>
+        <span class="value"><output id="thrOut"></output></span>
+        <input type="range" id="thr" min="8" max="80" step="1">
+      </label>
+      <label class="row">
+        <span>再検知しない時間</span>
+        <span class="value"><output id="coolOut"></output>秒</span>
+        <input type="range" id="cool" min="0.5" max="10" step="0.5">
+      </label>
+      <label class="row">
+        <span>ラインの太さ</span>
+        <span class="value"><output id="thickOut"></output>px</span>
+        <input type="range" id="thick" min="1" max="9" step="2">
+      </label>
+      <div class="row toggles">
+        <label><input type="checkbox" id="sound"> 通過音</label>
+        <label><input type="checkbox" id="vibrate"> バイブ</label>
+        <label><input type="checkbox" id="lockLine"> ライン固定</label>
+      </div>
+      <div class="row buttons">
+        <button id="btnFlip" class="btn small">カメラ切替</button>
+        <button id="btnTest" class="btn small">手動で通過</button>
+        <button id="btnCopy" class="btn small">記録をコピー</button>
+      </div>
+      <p class="hint">誤検知する場合は感度の数値を上げる／しきい値を上げてください。検知しない場合は下げてください。ラインはコースの幅だけを横切るよう短めに引くと安定します。</p>
+    </details>
+
+    <section class="laps">
+      <h2>ラップ一覧</h2>
+      <ol id="lapList" class="lap-list"></ol>
+      <p class="empty" id="emptyMsg">まだ記録はありません</p>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

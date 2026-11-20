@@ -51,6 +51,17 @@
 
     <details class="settings" id="settings">
       <summary>設定</summary>
+      <div class="row fps-row">
+        <span>フレームレート</span>
+        <div class="seg" role="radiogroup" aria-label="フレームレート">
+          <label><input type="radio" name="fps" value="auto"><span>自動</span></label>
+          <label><input type="radio" name="fps" value="30"><span>30</span></label>
+          <label><input type="radio" name="fps" value="60"><span>60</span></label>
+          <label><input type="radio" name="fps" value="120"><span>120</span></label>
+          <label><input type="radio" name="fps" value="240"><span>240</span></label>
+        </div>
+        <p class="fps-info" id="fpsInfo"></p>
+      </div>
       <label class="row">
         <span>検知感度 <small>(ライン上の変化割合)</small></span>
         <span class="value"><output id="sensOut"></output>%</span>

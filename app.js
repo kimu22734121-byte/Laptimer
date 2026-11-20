@@ -43,6 +43,7 @@ const DEFAULTS = {
   vibrate: true,
   lockLine: false,
   facing: 'environment',
+  fps: 'auto',       // 'auto' | 30 | 60 | 120 | 240
   // 0〜1 の正規化座標。車は画面の横方向から来ることが多いので縦線を初期値にする
   line: { x1: 0.5, y1: 0.2, x2: 0.5, y2: 0.8 },
   version: 2,
@@ -122,17 +123,11 @@ async function startCamera() {
         facingMode: { ideal: settings.facing },
         width: { ideal: 1280 },
         height: { ideal: 720 },
-        frameRate: { ideal: 60 },
+        frameRate: { ideal: settings.fps === 'auto' ? 60 : settings.fps },
       },
     });
-    // 60fps を強めに要求（非対応の端末ではそのまま）
-    const track = stream.getVideoTracks()[0];
-    try {
-      if ((track.getSettings().frameRate || 0) < 59) {
-        await track.applyConstraints({ frameRate: { exact: 60 } });
-      }
-    } catch (_) { /* 60fps 非対応 */ }
     state.stream = stream;
+    await applyFps();
     video.srcObject = stream;
     await video.play();
     placeholder.classList.add('hidden');
@@ -160,6 +155,8 @@ function stopCamera() {
   btnArm.disabled = true;
   if (state.phase !== 'idle') setPhase('idle');
   releaseWakeLock();
+  resetFpsCounter();
+  updateFpsInfo();
   updateStatus();
 }
 
@@ -246,17 +243,68 @@ function buildSamples() {
   state.bg = null; // ラインが変わったら背景を取り直す
 }
 
+/* ---------------- フレームレート設定 ---------------- */
+// 選んだフレームレートをカメラに適用する（カメラを止めずに切り替え可能）
+async function applyFps() {
+  const track = state.stream && state.stream.getVideoTracks()[0];
+  if (!track) return;
+  const caps = track.getCapabilities ? track.getCapabilities() : {};
+  const maxFps = caps.frameRate && caps.frameRate.max ? Math.round(caps.frameRate.max) : 0;
+  const want = settings.fps === 'auto'
+    ? Math.min(240, maxFps || 60)      // 自動：カメラが対応する最大（240まで）
+    : settings.fps;
+  let ok = true;
+  try {
+    await track.applyConstraints({ frameRate: { exact: want } });
+  } catch (_) {
+    ok = false;
+    // 指定値に非対応なら、できるだけ近い値で動かす
+    try { await track.applyConstraints({ frameRate: { ideal: want } }); } catch (__) { /* ignore */ }
+  }
+  state.camFps = Math.round(track.getSettings().frameRate || 0);
+  state.camMaxFps = maxFps;
+  state.fpsWanted = want;
+  state.fpsOk = ok && (!state.camFps || state.camFps >= want - 1);
+  updateFpsInfo();
+  resetFpsCounter();
+}
+
+function updateFpsInfo() {
+  const el = $('#fpsInfo');
+  if (!state.stream) {
+    el.textContent = 'カメラ起動後に、このカメラの対応フレームレートを表示します';
+    el.classList.remove('warn');
+    return;
+  }
+  const parts = [];
+  parts.push(`カメラ設定: ${state.camFps || '?'} fps`);
+  if (state.camMaxFps) parts.push(`このカメラの最大: ${state.camMaxFps} fps`);
+  if (!state.fpsOk && settings.fps !== 'auto') {
+    parts.push(`${settings.fps} fps には対応していません`);
+  }
+  el.textContent = parts.join(' ／ ');
+  el.classList.toggle('warn', !state.fpsOk && settings.fps !== 'auto');
+}
+
 /* ---------------- フレームレート表示 ---------------- */
 const fpsEl = $('#fps');
 const fpsCounter = { start: 0, frames: 0 };
+function resetFpsCounter() {
+  fpsCounter.start = 0;
+  fpsCounter.frames = 0;
+  fpsEl.textContent = '';
+}
 function countFps(now) {
   if (!fpsCounter.start) fpsCounter.start = now;
   fpsCounter.frames++;
   const el = now - fpsCounter.start;
   if (el >= 1000) {
     const fps = Math.round((fpsCounter.frames * 1000) / el);
-    fpsEl.textContent = `${fps} fps`;
-    fpsEl.classList.toggle('low', fps < 50);
+    // 解析できたフレーム数（画面のリフレッシュレートが上限になることがある）
+    fpsEl.textContent = state.camFps && Math.abs(state.camFps - fps) > 3
+      ? `カメラ ${state.camFps} / 解析 ${fps} fps`
+      : `${fps} fps`;
+    fpsEl.classList.toggle('low', fps < Math.min(50, (state.fpsWanted || 60) - 5));
     fpsCounter.start = now;
     fpsCounter.frames = 0;
   }
@@ -265,9 +313,7 @@ function countFps(now) {
 /* ---------------- フレーム解析ループ ---------------- */
 function startFrameLoop() {
   const loopId = ++state.frameLoopId;
-  fpsCounter.start = 0;
-  fpsCounter.frames = 0;
-  fpsEl.textContent = '';
+  resetFpsCounter();
   const useRVFC = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
 
   const onFrame = (now, meta) => {
@@ -640,6 +686,18 @@ btnReset.addEventListener('click', () => {
   totalEl.textContent = '--';
   if (state.phase !== 'idle') setPhase('armed');
 });
+
+// フレームレート選択
+document.querySelectorAll('input[name="fps"]').forEach((r) => {
+  r.checked = String(settings.fps) === r.value;
+  r.addEventListener('change', () => {
+    if (!r.checked) return;
+    settings.fps = r.value === 'auto' ? 'auto' : Number(r.value);
+    saveSettings();
+    applyFps();
+  });
+});
+updateFpsInfo();
 
 $('#btnLine').addEventListener('click', () => {
   settings.line = { ...DEFAULTS.line };

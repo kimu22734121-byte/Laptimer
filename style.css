@@ -213,7 +213,23 @@ body {
 .row.toggles label { display: flex; align-items: center; gap: 6px; }
 .row.toggles input { width: 22px; height: 22px; accent-color: var(--accent); }
 
-.row.buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.row.buttons { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+
+.fps {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, .55);
+  color: var(--good);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+.fps:empty { display: none; }
+.fps.low { color: var(--warn); }
 
 .hint { font-size: 12px; color: var(--muted); margin: 8px 0 0; line-height: 1.6; }
 

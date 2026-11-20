@@ -37,17 +37,30 @@ const pctx = proc.getContext('2d', { willReadFrequently: true });
 const DEFAULTS = {
   sensitivity: 12,   // ライン上の画素のうち何%が変化したら通過とみなすか
   threshold: 28,     // 背景との輝度差がこれ以上なら「変化した画素」
-  cooldown: 3,       // 検知後に再検知しない秒数
+  cooldown: 1,       // 検知後に再検知しない秒数
   thickness: 3,      // ラインの太さ（解析画素）
   sound: true,
   vibrate: true,
   lockLine: false,
   facing: 'environment',
-  line: { x1: 0.2, y1: 0.5, x2: 0.8, y2: 0.5 }, // 0〜1 の正規化座標
+  // 0〜1 の正規化座標。車は画面の横方向から来ることが多いので縦線を初期値にする
+  line: { x1: 0.5, y1: 0.2, x2: 0.5, y2: 0.8 },
+  version: 2,
 };
 
 const settings = loadJSON('laptimer.settings', DEFAULTS);
 settings.line = Object.assign({}, DEFAULTS.line, settings.line);
+
+// 旧バージョンの初期値（横線・3秒）のまま保存されていたら新しい初期値に置き換える
+let stored = null;
+try { stored = JSON.parse(localStorage.getItem('laptimer.settings')); } catch (_) { /* ignore */ }
+if (stored && !(stored.version >= 2)) {
+  const l = settings.line;
+  if (l.x1 === 0.2 && l.y1 === 0.5 && l.x2 === 0.8 && l.y2 === 0.5) settings.line = { ...DEFAULTS.line };
+  if (settings.cooldown === 3) settings.cooldown = DEFAULTS.cooldown;
+  settings.version = 2;
+  try { localStorage.setItem('laptimer.settings', JSON.stringify(settings)); } catch (_) { /* ignore */ }
+}
 
 function loadJSON(key, fallback) {
   try {
@@ -112,6 +125,13 @@ async function startCamera() {
         frameRate: { ideal: 60 },
       },
     });
+    // 60fps を強めに要求（非対応の端末ではそのまま）
+    const track = stream.getVideoTracks()[0];
+    try {
+      if ((track.getSettings().frameRate || 0) < 59) {
+        await track.applyConstraints({ frameRate: { exact: 60 } });
+      }
+    } catch (_) { /* 60fps 非対応 */ }
     state.stream = stream;
     video.srcObject = stream;
     await video.play();
@@ -226,9 +246,28 @@ function buildSamples() {
   state.bg = null; // ラインが変わったら背景を取り直す
 }
 
+/* ---------------- フレームレート表示 ---------------- */
+const fpsEl = $('#fps');
+const fpsCounter = { start: 0, frames: 0 };
+function countFps(now) {
+  if (!fpsCounter.start) fpsCounter.start = now;
+  fpsCounter.frames++;
+  const el = now - fpsCounter.start;
+  if (el >= 1000) {
+    const fps = Math.round((fpsCounter.frames * 1000) / el);
+    fpsEl.textContent = `${fps} fps`;
+    fpsEl.classList.toggle('low', fps < 50);
+    fpsCounter.start = now;
+    fpsCounter.frames = 0;
+  }
+}
+
 /* ---------------- フレーム解析ループ ---------------- */
 function startFrameLoop() {
   const loopId = ++state.frameLoopId;
+  fpsCounter.start = 0;
+  fpsCounter.frames = 0;
+  fpsEl.textContent = '';
   const useRVFC = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
 
   const onFrame = (now, meta) => {
@@ -239,6 +278,7 @@ function startFrameLoop() {
         && Math.abs(meta.captureTime - performance.now()) < 1000) {
       t = meta.captureTime;
     }
+    countFps(now);
     processFrame(t);
     schedule();
   };
@@ -599,6 +639,12 @@ btnReset.addEventListener('click', () => {
   currentEl.textContent = fmt(0);
   totalEl.textContent = '--';
   if (state.phase !== 'idle') setPhase('armed');
+});
+
+$('#btnLine').addEventListener('click', () => {
+  settings.line = { ...DEFAULTS.line };
+  saveSettings();
+  drawOverlay();
 });
 
 $('#btnFlip').addEventListener('click', () => {
